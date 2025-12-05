@@ -3,7 +3,8 @@ import numpy as np
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
-
+import matplotlib
+matplotlib.use("Qt5Agg")
 
 class UniversalMineralPreprocessor:
     """
@@ -97,115 +98,47 @@ class UniversalMineralPreprocessor:
 
     def step4_segment_universal(self, image):
         """
-        Step 4: Universal segmentation - works for ALL colors
-
-        Multi-stage strategy:
-        1. Edge detection (Canny)
-        2. Morphological operations to close contours
-        3. Contour filling to find the largest object
-        4. GrabCut for precise segmentation
-
-        This approach works for:
-        - Bright minerals (quartz)
-        - Dark minerals (obsidian)
-        - Colored minerals (sulfur)
-
-        Args:
-            image: Input image
-
-        Returns:
-            Binary segmentation mask
+    Universal segmentation for all mineral types.
+    GrabCut is completely removed to avoid errors.
+    Uses adaptive thresholding and largest contour extraction.
         """
         h, w = image.shape[:2]
 
-        # === Stage 1: Edge Detection ===
+    # 1. Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Gaussian blur before Canny (reduces noise)
+    # 2. Apply Gaussian blur to reduce noise
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # Canny edge detection
-        edges = cv2.Canny(blurred, threshold1=30, threshold2=100)
+    # 3. Adaptive threshold (works for light and dark minerals)
+        thresh = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV, 15, 5
+    )
 
-        # === Stage 2: Morphology - Close Contours ===
-        # Dilation: widen edges (connects broken lines)
+    # 4. Morphological closing to fill holes
         kernel = np.ones((7, 7), np.uint8)
-        dilated = cv2.dilate(edges, kernel, iterations=3)
+        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
 
-        # Closing: fill small holes
-        closed = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-        # === Stage 3: Fill Contours ===
-        # Find contours
+    # 5. Find contours
         contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Create mask with largest contour
-        rough_mask = np.zeros((h, w), dtype=np.uint8)
+        mask = np.zeros((h, w), dtype=np.uint8)
+
         if contours:
-            # Filter out noise (too small contours)
-            min_area = (h * w) * 0.01  # Minimum 1% of image area
-            valid_contours = [c for c in contours if cv2.contourArea(c) > min_area]
-
-            if valid_contours:
-                # Select largest contour
-                largest = max(valid_contours, key=cv2.contourArea)
-                cv2.drawContours(rough_mask, [largest], -1, 255, -1)
-
-        # If no contour found, return empty mask
-        if np.sum(rough_mask) == 0:
-            print("  ⚠️ Warning: No object detected. Please check the image.")
-            return rough_mask
-
-        # === Stage 4: GrabCut - Precise Segmentation ===
-        # GrabCut uses rough_mask as initialization hint
-        mask_grabcut = rough_mask.copy()
-
-        # Convert mask to GrabCut format
-        # 0 = background, 1 = foreground, 2 = probable background, 3 = probable foreground
-        grabcut_mask = np.where(rough_mask == 255, cv2.GC_FGD, cv2.GC_BGD).astype('uint8')
-
-        # Find bounding box of the object
-        y_indices, x_indices = np.where(rough_mask > 0)
-        if len(y_indices) > 0 and len(x_indices) > 0:
-            x1, x2 = x_indices.min(), x_indices.max()
-            y1, y2 = y_indices.min(), y_indices.max()
-
-            # Add margin
-            margin = 10
-            x1 = max(0, x1 - margin)
-            y1 = max(0, y1 - margin)
-            x2 = min(w, x2 + margin)
-            y2 = min(h, y2 + margin)
-
-            rect = (x1, y1, x2 - x1, y2 - y1)
-
-            # Apply GrabCut algorithm
-            bgd_model = np.zeros((1, 65), np.float64)
-            fgd_model = np.zeros((1, 65), np.float64)
-
-            try:
-                cv2.grabCut(image, grabcut_mask, rect, bgd_model, fgd_model,
-                            iterCount=5, mode=cv2.GC_INIT_WITH_RECT)
-
-                # Convert GrabCut result to binary mask
-                final_mask = np.where((grabcut_mask == cv2.GC_FGD) |
-                                      (grabcut_mask == cv2.GC_PR_FGD), 255, 0).astype('uint8')
-            except:
-                # If GrabCut fails, use rough mask
-                print("  ⚠️ Warning: GrabCut failed, using basic mask")
-                final_mask = rough_mask
+        # Select the largest contour
+            largest = max(contours, key=cv2.contourArea)
+            cv2.drawContours(mask, [largest], -1, 255, -1)
         else:
-            final_mask = rough_mask
+            print("⚠️ Warning: No object detected. Returning empty mask.")
+            return mask
 
-        # === Stage 5: Post-processing ===
-        # Remove small noise
+    # 6. Optional: remove small noise and smooth edges
         kernel_small = np.ones((3, 3), np.uint8)
-        final_mask = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel_small, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel_small, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-        # Fill holes
-        final_mask = cv2.morphologyEx(final_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-        return final_mask
+        return mask
 
     def step5_remove_artifacts(self, image, mask):
         """
