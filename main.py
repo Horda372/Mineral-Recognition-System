@@ -555,7 +555,7 @@ class StatisticalMineralClassifier:
 if __name__ == "__main__":
     # 1. KONFIGURACJA ŚCIEŻEK
     # Tutaj podaj ścieżkę do zdjęcia, które chcesz zidentyfikować:
-    SCIEZKA_DO_TESTU = Path("images/to_identify/2.jpeg")
+    SCIEZKA_DO_TESTU = Path("images/to_identify/3.jpg")
 
     # Folder, w którym masz już przygotowane wzorce (do nauczenia klasyfikatora)
     BASE_PROCESSED = Path("images/minerals_processed")
