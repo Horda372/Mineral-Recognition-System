@@ -7,18 +7,6 @@ import matplotlib.pyplot as plt
 class UniversalMineralPreprocessor:
     """
     Universal Mineral Image Preprocessor
-
-    A robust preprocessing pipeline designed to work with various mineral types:
-    - Sulfur (yellow-green)
-    - Obsidian (black)
-    - Quartz (transparent/white)
-    - And others...
-
-    Strategy:
-    Instead of relying on specific color values, this preprocessor uses:
-    1. Edge detection (works for all objects)
-    2. GrabCut algorithm (intelligent segmentation)
-    3. Object-background contrast analysis
     """
 
     def __init__(self, input_dir, output_dir):
@@ -128,7 +116,7 @@ class UniversalMineralPreprocessor:
             largest = max(contours, key=cv2.contourArea)
             cv2.drawContours(mask, [largest], -1, 255, -1)
         else:
-            print("⚠️ Warning: No object detected. Returning empty mask.")
+            print("Warning: No object detected. Returning empty mask.")
             return mask
 
     # 6. Optional: remove small noise and smooth edges
@@ -384,7 +372,7 @@ class UniversalMineralPreprocessor:
                       list(self.input_dir.glob('*.jpeg'))
 
         if not image_files:
-            print("❌ No images found!")
+            print("No images found!")
             return
 
         mineral_name = self.input_dir.name
@@ -408,13 +396,13 @@ class UniversalMineralPreprocessor:
                 cv2.imwrite(str(self.output_dir / output_name), processed)
                 cv2.imwrite(str(self.output_dir / mask_name), mask)
 
-                print(f"✅ Saved: {output_name}")
+                print(f"Saved: {output_name}")
 
             except Exception as e:
-                print(f"❌ Error processing {img_path.name}: {e}")
+                print(f"Error processing {img_path.name}: {e}")
 
         print(f"\n{'#' * 60}")
-        print(f"✅ COMPLETE! Processed images saved to: {self.output_dir}")
+        print(f"COMPLETE! Processed images saved to: {self.output_dir}")
         print(f"{'#' * 60}\n")
 
     def process_all_minerals(self, minerals_list, visualize_first=True):
@@ -436,7 +424,7 @@ class UniversalMineralPreprocessor:
             output_path = self.output_dir / mineral
 
             if not input_path.exists():
-                print(f"⚠️  Skipped {mineral} - directory does not exist")
+                print(f" Skipped {mineral} - directory does not exist")
                 continue
 
             # Process this mineral
@@ -478,7 +466,7 @@ class StatisticalMineralClassifier:
         """Tworzy unikalny podpis cyfrowy z lepszą obsługą błędów"""
         img = cv2.imread(str(image_path))
         if img is None:
-            print(f"❌ Nie można otworzyć pliku: {image_path}")
+            print(f"Nie można otworzyć pliku: {image_path}")
             return None
 
         # 1. Konwersja do HSV
@@ -486,7 +474,7 @@ class StatisticalMineralClassifier:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # 2. Inteligentna maska (szukamy wszystkiego, co NIE jest białym tłem)
-        # Zakładamy, że tło po Twoim preprocessingu ma jasność > 240
+        # Zakładamy, że tło po preprocessingu ma jasność > 240
         mask = gray < 240
 
         # Sprawdzenie: czy maska coś znalazła?
@@ -494,7 +482,7 @@ class StatisticalMineralClassifier:
             # Jeśli maska jest pusta, weź środek obrazu (bezpiecznik)
             h, w = gray.shape
             mask[h//4:3*h//4, w//4:3*w//4] = 1
-            print(f"⚠️ Uwaga: Maska dla {Path(image_path).name} była pusta. Używam środka obrazu.")
+            print(f"0Uwaga: Maska dla {Path(image_path).name} była pusta. Używam środka obrazu.")
 
         mask = mask.astype(np.uint8)
 
@@ -505,7 +493,7 @@ class StatisticalMineralClassifier:
         # Tekstura - odchylenie standardowe jasności pikseli obiektu
         roughness = np.std(gray[mask > 0])
 
-        # 4. NOWOŚĆ: Proporcje kształtu (Współczynnik wydłużenia)
+        # 4. Proporcje kształtu (Współczynnik wydłużenia)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         aspect_ratio = 1.0
         if contours:
@@ -555,7 +543,7 @@ class StatisticalMineralClassifier:
 if __name__ == "__main__":
     # 1. KONFIGURACJA ŚCIEŻEK
     # Tutaj podaj ścieżkę do zdjęcia, które chcesz zidentyfikować:
-    SCIEZKA_DO_TESTU = Path("images/to_identify/3.jpg")
+    SCIEZKA_DO_TESTU = Path("images/to_identify/3.jpg") # 3.jpg / 1.jpeg
 
     # Folder, w którym masz już przygotowane wzorce (do nauczenia klasyfikatora)
     BASE_PROCESSED = Path("images/minerals_processed")
@@ -576,7 +564,7 @@ if __name__ == "__main__":
     print(f"\n--- Faza 2: Analiza pliku: {SCIEZKA_DO_TESTU.name} ---")
 
     if not SCIEZKA_DO_TESTU.exists():
-        print(f"❌ Błąd: Plik {SCIEZKA_DO_TESTU} nie istnieje!")
+        print(f"Błąd: Plik {SCIEZKA_DO_TESTU} nie istnieje!")
     else:
         try:
             # KROK A: Preprocessing (Denoise -> Contrast -> Segment -> Normalize)
@@ -597,4 +585,4 @@ if __name__ == "__main__":
             print("=" * 40)
 
         except Exception as e:
-            print(f"❌ Wystąpił błąd podczas analizy: {e}")
+            print(f"Wystąpił błąd podczas analizy: {e}")
